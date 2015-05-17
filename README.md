@@ -1,2 +1,2 @@
 # AngularJSPoC
-Some PoC's with AngularJS
+A modular application PoC with AngularJS
