@@ -1,0 +1,27 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+
+    <script data-main="main.js" src="Scripts/require.js"></script>
+    <link href="Content/angular-block-ui.css" rel="stylesheet" />
+    <link href="Content/bootstrap.css" rel="stylesheet" />
+    <link href="Content/Application.css" rel="stylesheet" />
+
+</head>
+
+<body ng-controller="indexController" ng-init="initializeController()" ng-cloak>
+
+    <tabset>
+        <tab ng-repeat="t in Tabs"
+             heading="{{t.Name}}"
+             select="goToTab(t)"
+             active="t.Active">
+        </tab>
+    </tabset>
+
+    <div ng-view></div>
+
+</body>
+
+</html>
