@@ -1,18 +1,27 @@
 ﻿"use strict";
-    
-define(['angularAMD', 'angular-route', 'ui-bootstrap', 'angular-sanitize', 'blockUI', ], function (angularAMD) {
-    var app = angular.module("mainModule", ['ngRoute', 'blockUI', 'ngSanitize', 'ui.bootstrap']);
 
-    app.filter("leadingZeroes", function () {
-        return function (data) {
-            var pad = "000" + data;
-            pad = pad.substr(pad.length - 3);
-            return pad;
-        }
-    });
+define(
+    [
+        'angularAMD',
+        'angular-route',
+        'ui-bootstrap',
+        'angular-sanitize',
+        'blockUI',
+        'uiRouter'
+    ],
+    function(angularAMD) {
+        var app = angular.module("mainModule", ['ngRoute', 'blockUI', 'ngSanitize', 'ui.bootstrap', 'ui.router']);
+
+        app.filter("leadingZeroes", function() {
+            return function(data) {
+                var pad = "000" + data;
+                pad = pad.substr(pad.length - 3);
+                return pad;
+            }
+        });
 
 
-    /*app.config(function ($httpProvider) {
+        /*app.config(function ($httpProvider) {
         $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
         $httpProvider.defaults.withCredentials = true;
     });
@@ -28,11 +37,46 @@ define(['angularAMD', 'angular-route', 'ui-bootstrap', 'angular-sanitize', 'bloc
 
     });*/
 
-    app.config(['$routeProvider', function ($routeProvider) {
+        app.config(function($stateProvider, $routeProvider) {
 
-        $routeProvider
+            app.stateProvider = $stateProvider;
 
-           .when("/", angularAMD.route({
+            $routeProvider.otherwise('Home');
+
+           /* $stateProvider.state('Home', {
+                url: "/home",
+                templateUrl: "Modules/Home/Views/Home.html",
+                controllerProvider: function (resolveParam) {
+                    var ctrlName = resolveParam + "Controller";
+                    return ctrlName;
+                },
+                resolve: { resolveParam: function () { return 'home'; } }
+            });*/
+
+            $stateProvider
+                .state('Home', angularAMD.route({
+                    url: "/home",
+                    templateUrl: "Modules/Home/Views/Home.html",
+                    resolve: {
+                        loadController: ['$q', '$stateParams',
+                            function ($q, $stateParams) {
+                                // get the controller name === here as a path to Controller_Name.js
+                                // which is set in main.js path {}
+                                //var controllerName = controllerNameByParams($stateParams);
+
+                                var deferred = $q.defer();
+                                require(['homeController'], function () { deferred.resolve(); });
+                                return deferred.promise;
+                            }]
+                    },
+                    controllerProvider: function ($stateParams) {
+                        // get the controller name === here as a dynamic controller Name
+                        //var controllerName = controllerNameByParams($stateParams);
+                        return 'homeController';
+                    },
+                }));
+
+            /*  .when("/", angularAMD.route({
 
                templateUrl: function (rp) { return 'Modules/Home/Views/home.html'; },
                controllerUrl: "Modules/Home/Controllers/homeController"
@@ -118,133 +162,169 @@ define(['angularAMD', 'angular-route', 'ui-bootstrap', 'angular-sanitize', 'bloc
 
             }))
 
-            .otherwise({ redirectTo: '/' })
-    }]);
+            .otherwise({ redirectTo: '/' })*/
+        });
 
 
-    var indexController = function($scope, $rootScope, $http, $location, blockUI) {
+        var indexController = function ($scope, $rootScope, $http, $state, blockUI) {
 
-        $scope.$on('$routeChangeStart', function(scope, next, current) {
+            $scope.$on('$routeChangeStart', function(scope, next, current) {
 
-            if ($rootScope.IsloggedIn == true) {
-                $scope.authenicateUserComplete();
-                //$scope.authenicateUser($location.path(), $scope.authenicateUserComplete, $scope.authenicateUserError);
+                if ($rootScope.IsloggedIn == true) {
+                    $scope.authenicateUserComplete();
+                    //$scope.authenicateUser($location.path(), $scope.authenicateUserComplete, $scope.authenicateUserError);
+                }
+
+            });
+
+            $scope.$on('$routeChangeSuccess', function(scope, next, current) {
+
+                setTimeout(function() {
+                    if ($scope.isCollapsed == true) {
+                        set95PercentWidth();
+                    }
+                }, 1000);
+
+
+            });
+
+            $scope.initializeController = function() {
+                $rootScope.displayContent = false;
+
+                $scope.initializeApplication($scope.initializeApplicationComplete, $scope.initializeApplicationError);
+
             }
 
-        });
+            function generateUUID() {
+                var d = new Date().getTime();
+                var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                    var r = (d + Math.random() * 16) % 16 | 0;
+                    d = Math.floor(d / 16);
+                    return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                });
+                return uuid;
+            };
 
-        $scope.$on('$routeChangeSuccess', function(scope, next, current) {
+            $rootScope.openModule = function(module) {
 
-            setTimeout(function() {
-                if ($scope.isCollapsed == true) {
-                    set95PercentWidth();
-                }
-            }, 1000);
+                var guid = generateUUID();
 
+                $rootScope.Tabs.push(
+               {
+                   Name: module.Name,
+                   Id: guid,
+                   Url: module.Url,
+                   Active: true
+               });
 
-        });
+                app.stateProvider.state(guid, angularAMD.route({
+                    templateUrl: function () { return 'Modules/' + module.Name + '/Views/' + module.Name + '.html'; },
 
-        $scope.initializeController = function() {
-            $rootScope.displayContent = false;
+                    resolve: {
+                        load: [
+                            '$q', '$rootScope', '$location', function ($q, $rootScope) {
 
-            $scope.initializeApplication($scope.initializeApplicationComplete, $scope.initializeApplicationError);
+                                var loadController = "Modules/" + module.Name + "/Controllers/" + module.Name + "Controller";
 
-        }
+                                var deferred = $q.defer();
+                                require([loadController], function () {
+                                    $rootScope.$apply(function () {
+                                        deferred.resolve();
+                                    });
+                                });
+                                return deferred.promise;
+                            }
+                        ]
+                    }
+                }));
 
-        $rootScope.openModule = function(module) {
-            $rootScope.Tabs.push(
-            {
-                Name: module.Name,
-                Id: module.Id,
-                Url: module.Url,
-                Active: true
-            });
-        }
+               
+            }
 
-        $scope.initializeApplicationComplete = function(response) {
+            $scope.initializeApplicationComplete = function(response) {
 
-            $rootScope.Modules = [
-                {
-                    Name: 'Module1',
-                    Id: 'M1',
-                    Url: 'Module1'
-                },
-                {
-                    Name: 'Module2',
-                    Id: 'M2',
-                    Url: 'Module2'
-                }
-            ];
+                $rootScope.Modules = [
+                    {
+                        Name: 'Module1',
+                        Id: 'M1',
+                        Url: 'Module1'
+                    },
+                    {
+                        Name: 'Module2',
+                        Id: 'M2',
+                        Url: 'Module2'
+                    }
+                ];
 
-            $rootScope.Tabs = [
-                {
-                    Name: 'Home',
-                    Id: 'Home',
-                    Url: 'Home',
-                    Active: true
-                }
-            ];
+                $rootScope.Tabs = [
+                    {
+                        Name: 'Home',
+                        Id: 'Home',
+                        Url: 'Home',
+                        Active: true
+                    }
+                ];
 
-            $rootScope.displayContent = true;
-            $rootScope.IsloggedIn = true;
-        }
+                $rootScope.displayContent = true;
+                $rootScope.IsloggedIn = true;
+            }
 
-        $scope.goToTab = function(tab) {
-            $location.path(tab.Url);
-        }
+            $scope.goToTab = function(tab) {
+                $state.go(tab.Id);
+            }
 
-        $scope.initializeApplication = function(successFunction, errorFunction) {
-            blockUI.start();
-            successFunction();
-            //$scope.AjaxGet("/api/main/InitializeApplication", successFunction, errorFunction);
-            blockUI.stop();
+            $scope.initializeApplication = function(successFunction, errorFunction) {
+                blockUI.start();
+                successFunction();
+                //$scope.AjaxGet("/api/main/InitializeApplication", successFunction, errorFunction);
+                blockUI.stop();
+            };
+
+            $scope.authenicateUser = function(route, successFunction, errorFunction) {
+                var authenication = new Object();
+                authenication.route = route;
+                $scope.AjaxGetWithData(authenication, "/api/main/AuthenicateUser", successFunction, errorFunction);
+            };
+
+            $scope.authenicateUserComplete = function(response) {
+
+                if (response.IsAuthenicated == false)
+                    window.location = "/index.html";
+            }
+
+            $scope.authenicateUserError = function(response) {
+                alert("ERROR= " + response.IsAuthenicated);
+            }
+
+            $scope.AjaxGet = function(route, successFunction, errorFunction) {
+                setTimeout(function() {
+                    $http({ method: 'GET', url: route }).success(function(response, status, headers, config) {
+                        successFunction(response, status);
+                    }).error(function(response) {
+                        errorFunction(response);
+                    });
+                }, 1);
+
+            }
+
+            $scope.AjaxGetWithData = function(data, route, successFunction, errorFunction) {
+                setTimeout(function() {
+                    $http({ method: 'GET', url: route, params: data }).success(function(response, status, headers, config) {
+                        successFunction(response, status);
+                    }).error(function(response) {
+                        errorFunction(response);
+                    });
+                }, 1);
+
+            }
+
         };
 
-        $scope.authenicateUser = function(route, successFunction, errorFunction) {
-            var authenication = new Object();
-            authenication.route = route;
-            $scope.AjaxGetWithData(authenication, "/api/main/AuthenicateUser", successFunction, errorFunction);
-        };
+        indexController.$inject = ['$scope', '$rootScope', '$http', '$state', 'blockUI'];
+        app.controller("indexController", indexController);
 
-        $scope.authenicateUserComplete = function(response) {
+        // Bootstrap Angular when DOM is ready
+        angularAMD.bootstrap(app);
 
-            if (response.IsAuthenicated == false)
-                window.location = "/index.html";
-        }
-
-        $scope.authenicateUserError = function(response) {
-            alert("ERROR= " + response.IsAuthenicated);
-        }
-
-        $scope.AjaxGet = function(route, successFunction, errorFunction) {
-            setTimeout(function() {
-                $http({ method: 'GET', url: route }).success(function(response, status, headers, config) {
-                    successFunction(response, status);
-                }).error(function(response) {
-                    errorFunction(response);
-                });
-            }, 1);
-
-        }
-
-        $scope.AjaxGetWithData = function(data, route, successFunction, errorFunction) {
-            setTimeout(function() {
-                $http({ method: 'GET', url: route, params: data }).success(function(response, status, headers, config) {
-                    successFunction(response, status);
-                }).error(function(response) {
-                    errorFunction(response);
-                });
-            }, 1);
-
-        }
-
-    };
-
-    indexController.$inject = ['$scope', '$rootScope', '$http', '$location', 'blockUI'];
-    app.controller("indexController", indexController);
-
-    // Bootstrap Angular when DOM is ready
-    angularAMD.bootstrap(app);
-
-    return app;
-});
+        return app;
+    });
